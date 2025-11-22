@@ -1,0 +1,8 @@
+# Visual Studio
+.vs/
+Debug/
+Release/
+x64/
+*.user
+*.vcxproj.user
+ipch/
