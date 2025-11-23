@@ -389,6 +389,7 @@ void CDirSizeVisualizerDlg::UpdateListView(const std::vector<ScanResult>& result
   - 하지만 전체 파일 개수를 정확히 알 수 없고,
   - 디렉터리 깊이에 따라 처리 시간이 크게 달라져서,
   - 초반에는 빠르게 올라가다가 **어느 순간 거의 안 움직이는 것처럼 느껴지는** 문제가 있었다.
+
 **해결**
 - 정확한 %를 맞추는 것보다
   - **"계속 진행되고 있다"는 피드백이 더 중요**하다고 보고,
