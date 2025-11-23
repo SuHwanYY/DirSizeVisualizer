@@ -336,7 +336,7 @@ void DirectoryScanner::ScanRecursive(const std::wstring& path)
 
 ---
 
-## 구현하면서 겪은 어려움과 해결 과정
+# 구현하면서 겪은 어려움과 해결 과정
 
 ## ✔️리스트뷰에 모든 항목을 다 넣었을 때의 성능 문제
 
