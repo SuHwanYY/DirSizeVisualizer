@@ -59,7 +59,7 @@
 ## 내부 구조 설계
 💡이 프로젝트는 **디렉토리 탐색 로직과 UI & 스레드 제어**를 명확히 분리하는 것을 목표로 설계했다.
 
-- **CDirSizeVisualizerDlg**(UI & 제어 담당)
+- **✔️CDirSizeVisualizerDlg**(UI & 제어 담당)
   - **하는 일**
     - 경로 입력 에딧, 시작/중비 버튼, 리스트뷰, ProgressBar, 상태 텍스트, `탐색 경로:` 라벨 등 **UI 전체 관리**
     - **"시작" 버튼 클릭 시**
@@ -75,7 +75,7 @@
       - **"UI + 스레드 라이프사이클 + 표시/정렬만 담당하는 레이어".**
    
 
-- **DirectoryScanner**(디렉터리 탐색 담당)
+- **✔️DirectoryScanner**(디렉터리 탐색 담당)
   - 실제 디렉터리/파일을 읽고 크기를 계산하는 **핵심 로직 클래스**
   - **하는 일**
     - 시작 경로(기본 `C:\`)부터 **DFS 기반 재귀 탐색**으로 모든 하위 폴더/파일 순회.
@@ -178,12 +178,12 @@ bool              m_isScanning = false;
   - `m_pScanThread = AfxBeginThread(ScanThreadProc, this);`
 - WM_SCAN_FINISHED`에서:
   - 스레드가 끝난 뒤 `delete m_scanner; m_scanner = nullptr;`
-  - `m_pScanThread`는 MFC가 관리하지만, 필요 시 nullptr로 초기화.
-<br>
+  - `m_pScanThread`는 MFC가 관리하지만, 필요 시 nullptr로 초기화.  
 **스마트 포인터가 없는 상태에서 이런 수동 규칙을 직접 잡아보는 게 이번 과제의 핵심 중 하나였다.**
 
 ✔️**멀티스레드 구조**
-**1. 스레드 시작**
+
+- **1. 스레드 시작**
 ```cpp
 // 시작 버튼 핸들러
 void CDirSizeVisualizerDlg::OnBnClickedButtonStart()
@@ -225,7 +225,7 @@ UINT CDirSizeVisualizerDlg::ScanThreadProc(LPVOID pParam)
 }
 ```
 
-**2. 중지 버튼 &  안전한 종료**
+- **2. 중지 버튼 &  안전한 종료**
 ```cpp
 void CDirSizeVisualizerDlg::OnBnClickedButtonStop()
 {
