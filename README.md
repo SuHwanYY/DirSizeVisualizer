@@ -127,11 +127,11 @@ struct ScanUpdateInfo {
 ## 주요 구현(수동 메모리, 멀티스레드, DFS 재귀)
 
 ✔️ **스마트 포인터 대신 수동 메모리 관리**
-이번 과제에서는 **스마트 포인터를 일부러 쓰지 않고,**
+이번 과제에서는 **스마트 포인터를 일부러 쓰지 않고,**  
 멀티스레드 환경에서 `new`/`delete`를 직접 관리해 보는 연습을 했다.
-
+<br>
 핵심 패턴은 다음 두 가지였다.
-
+<br>
 **1. 워커 스레드 ➡ UI 스레드로 데이터를 넘길 때**
 ```cpp
 // DirectoryScanner 내부 (워커 스레드)
@@ -179,6 +179,7 @@ bool              m_isScanning = false;
 - WM_SCAN_FINISHED`에서:
   - 스레드가 끝난 뒤 `delete m_scanner; m_scanner = nullptr;`
   - `m_pScanThread`는 MFC가 관리하지만, 필요 시 nullptr로 초기화.
+<br>
 **스마트 포인터가 없는 상태에서 이런 수동 규칙을 직접 잡아보는 게 이번 과제의 핵심 중 하나였다.**
 
 ✔️**멀티스레드 구조**
@@ -255,7 +256,7 @@ void DirectoryScanner::ScanRecursive(const std::wstring& path)
     // 각 항목 처리 전에/후에 stop 체크
 }
 ```
-- 강제로 스레드를 Kill하는 방식이 아니라 **"협조적인 종료(cooperative cancel)"를 선택해서,
+- 강제로 스레드를 Kill하는 방식이 아니라 **"협조적인 종료(cooperative cancel)"를 선택해서,  
   **리소스 정리**나 **메모리 해제 순서**가 꼬이지 않도록 했다.
 
 ✔️**DFS 기반 재귀 탐색**
@@ -323,8 +324,8 @@ void DirectoryScanner::ScanRecursive(const std::wstring& path)
     }
 }
 ```
-별도의 거대한 트리를 만들지 않고,
-"**방문하는 디렉터리에서 바로바로 처리하고 내려가고, 스택에서 빠지면 끝나면 구조**"로 구현해서
+별도의 거대한 트리를 만들지 않고,  
+"**방문하는 디렉터리에서 바로바로 처리하고 내려가고, 스택에서 빠지면 끝나면 구조**"로 구현해서  
   - 메모리 사용량을 줄이고,
   - 탐색 로직을 단순하게 유지했다.
 
@@ -402,8 +403,8 @@ int CDirSizeVisualizerDlg::CalcProgress(ULONGLONG processed)
 - 핵심은
   - 초반에 너무 빨리 90%까지 가 버리지 않고,
   - 끝날 때쯤 100% 근처로 모이게 만드는 감각적인 튜팅이었다.
-➡ 이렇게 바꾸고 나서는
-탐색이 오래 걸려도 ProgressBar가 조금씩 꾸준히 움직여서,
+➡ 이렇게 바꾸고 나서는  
+탐색이 오래 걸려도 ProgressBar가 조금씩 꾸준히 움직여서,  
 사용자 경험이 훨씬 낫다고 느꼈다.
 
 ✔️**워커 스레드와 UI 스레드 사이의 메모리 관리**
@@ -417,7 +418,7 @@ int CDirSizeVisualizerDlg::CalcProgress(ULONGLONG processed)
   - **소유권 규칙을 조금만 헷갈리면 메모리 누수나 double free 위험**이 있다.
  
 **해결**
-- "스레드 간 데이터를 건널 때는 항상 `ScanUpdateInfo*`로 보내고,
+- "스레드 간 데이터를 건널 때는 항상 `ScanUpdateInfo*`로 보내고,  
   `new`는 워커 한 번, `delete`는 UI 한 번"같이 단순하게 정리했다.
 - 구현 패턴을 **항상 같은 형태**로 유지
 
@@ -435,9 +436,9 @@ LRESULT OnScanUpdate(WPARAM, LPARAM lParam)
     delete info;
 }
 ```
-- 다른 곳에서 `ScanUpdateInfo*`를 멤버로 보관하거나,
+- 다른 곳에서 `ScanUpdateInfo*`를 멤버로 보관하거나,  
   여러 번 `delete` 할 수 있는 여지를 애초에 만들지 않았다.
-➡ 이 규칙을 스스로 강제하면서
+➡ 이 규칙을 스스로 강제하면서  
 **"멀티스레드 + 수동 메모리 관리에서 가장 위험한 부분을 직접 컨트롤해봤다"는 경험을 얻을 수 있었다.**
 
 ✔️**중지 기능 구현 방식 선택**
@@ -456,10 +457,10 @@ LRESULT OnScanUpdate(WPARAM, LPARAM lParam)
   - 각 재귀 진입/루프마다 `IsStopRequesTed()`를 체크하여 **자연스럽게 상위로 빠져나오도록** 설계.
 
 - 정리 순서
-  - 중지 버튼 ➡ `RequestStop()` ➡ 재귀가 차례차례 종료 ➡ `StartScan()`이 끝 ➡
+  - 중지 버튼 ➡ `RequestStop()` ➡ 재귀가 차례차례 종료 ➡ `StartScan()`이 끝 ➡  
     `WM_SCAN_FINISHED` 전송 ➡ UI 스레드에서 버튼 상태 복구 및 스캐너 삭제.
 
-➡ 이 과정 덕분에,
+➡ 이 과정 덕분에,  
 "멀티스레드에서 강제 종료 대신 플래그로 종료를 설계하는 패턴"을 직접 체감할 수 있었다.
 
 ✔️**그 외 자잘한 시행착오들**
