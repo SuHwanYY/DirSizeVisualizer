@@ -260,7 +260,7 @@ void DirectoryScanner::ScanRecursive(const std::wstring& path)
 - 강제로 스레드를 Kill하는 방식이 아니라 **"협조적인 종료(cooperative cancel)"를 선택해서,  
   **리소스 정리**나 **메모리 해제 순서**가 꼬이지 않도록 했다.
 
-✔️**DFS 기반 재귀 탐색**
+✔️**DFS 기반 재귀 탐색**  
 탐색은 **DFS(Depth-First Search)를 재귀로 구현했다.**
 ```cpp
 void DirectoryScanner::StartScan()
@@ -274,6 +274,7 @@ void DirectoryScanner::StartScan()
     }
 }
 ```
+```cpp
 void DirectoryScanner::ScanRecursive(const std::wstring& path)
 {
     if (IsStopRequested()) return;
