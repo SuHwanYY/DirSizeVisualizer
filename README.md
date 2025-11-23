@@ -104,7 +104,7 @@ struct ScanUpdateInfo {
 - **워커 스레드** : `ScanUpdateInfo* info = new ScanUpdateInfo;` ➡ 데이터 채우고 ➡ `PostMessage`
 - **UI 스레드** : 메시지 핸들러에서 `ScanUpdateInfo*`를 받아 사용 후 반드시 `delete`
 
-💡**클래스를 2개만 분리한 이유**
+💡**클래스를 2개만 분리한 이유**  
 처음에는 `ListViewManager`, `ProgressStatus`, `ScanController`같은 클래스를 더 쪼갤까도 고민했다.
 하지만 실제로 구현을 진행하면서,
 - 프로젝트 규모가 **"MFC 다이얼로그 + DFS 탐색기"** 수준이고,
