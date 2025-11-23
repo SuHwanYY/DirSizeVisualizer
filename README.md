@@ -88,7 +88,7 @@
     - 탐색이 끝나면 마지막으로 `WM_SCAN_FINISHED` 메시지 전송.
  
 💡**공용 데이터 구조(간략하게)**
-`
+```cpp
 struct ScanResult {
   std::wstring name;      // 파일/폴더 이름
   std::wstring type;      // "File" or "Directory"
@@ -100,7 +100,7 @@ struct ScanUpdateInfo {
   std::vector<ScanResult> results;   // 이번 배치에 추가된 항목들
   ULONGLONG processedCount = 0;      // 지금까지 처리한 전체 개수
 };
-`
+```
 - **워커 스레드** : `ScanUpdateInfo* info = new ScanUpdateInfo;` ➡ 데이터 채우고 ➡ `PostMessage`
 - **UI 스레드** : 메시지 핸들러에서 `ScanUpdateInfo*`를 받아 사용 후 반드시 `delete`
 
@@ -133,7 +133,7 @@ struct ScanUpdateInfo {
 핵심 패턴은 다음 두 가지였다.
 
 **1. 워커 스레드 ➡ UI 스레드로 데이터를 넘길 때**
-`
+```cpp
 // DirectoryScanner 내부 (워커 스레드)
 void DirectoryScanner::PostBatch(const std::vector<ScanResult>& batch) {
     if (batch.empty() || m_pNotifyWnd == nullptr) return;
@@ -144,8 +144,8 @@ void DirectoryScanner::PostBatch(const std::vector<ScanResult>& batch) {
 
     m_pNotifyWnd->PostMessage(WM_SCAN_UPDATE, 0, reinterpret_cast<LPARAM>(info));
 }
-`
-`
+```
+```cpp
 // CDirSizeVisualizerDlg 메시지 핸들러 (UI 스레드)
 LRESULT CDirSizeVisualizerDlg::OnScanUpdate(WPARAM, LPARAM lParam)
 {
@@ -159,7 +159,7 @@ LRESULT CDirSizeVisualizerDlg::OnScanUpdate(WPARAM, LPARAM lParam)
     delete info;  // 여기서 반드시 delete
     return 0;
 }
-`
+```
 - **소유권 규칙**을 명확히 정했다.
   - `new`는 워커 스레드에서만.
   - `delete`는 UI 스레드 메시지 핸들러에서만.
@@ -167,12 +167,12 @@ LRESULT CDirSizeVisualizerDlg::OnScanUpdate(WPARAM, LPARAM lParam)
   - 이중 해제나 "누가 지우는지 애매한 포인터" 문제를 피할 수 있었다.
  
 **2. 스캐너 객체와 스레드 포인터 관리**
-`
+```cpp
 // 다이얼로그 멤버
 DirectoryScanner* m_scanner = nullptr;
 CWinThread*       m_pScanThread = nullptr;
 bool              m_isScanning = false;
-`
+```
 - 시작 버튼:
   - `m_scanner = new DirectoryScanner(...);`
   - `m_pScanThread = AfxBeginThread(ScanThreadProc, this);`
@@ -183,7 +183,7 @@ bool              m_isScanning = false;
 
 ✔️**멀티스레드 구조**
 **1. 스레드 시작**
-`
+```cpp
 // 시작 버튼 핸들러
 void CDirSizeVisualizerDlg::OnBnClickedButtonStart()
 {
@@ -209,8 +209,8 @@ void CDirSizeVisualizerDlg::OnBnClickedButtonStart()
     m_isScanning = true;
     m_pScanThread = AfxBeginThread(&CDirSizeVisualizerDlg::ScanThreadProc, this);
 }
-`
-`
+```
+```cpp
 // 정적 스레드 함수
 UINT CDirSizeVisualizerDlg::ScanThreadProc(LPVOID pParam)
 {
@@ -222,10 +222,10 @@ UINT CDirSizeVisualizerDlg::ScanThreadProc(LPVOID pParam)
 
     return 0;
 }
-`
+```
 
 **2. 중지 버튼 &  안전한 종료**
-`
+```cpp
 void CDirSizeVisualizerDlg::OnBnClickedButtonStop()
 {
     if (!m_isScanning || m_scanner == nullptr) return;
@@ -233,8 +233,8 @@ void CDirSizeVisualizerDlg::OnBnClickedButtonStop()
     m_scanner->RequestStop();   // stop 플래그만 세움
     // 실제 종료는 워커 스레드가 재귀를 빠져나오면서 자연스럽게 끝남
 }
-`
-`
+```
+```cpp
 // DirectoryScanner 내부
 void DirectoryScanner::RequestStop()
 {
@@ -245,8 +245,8 @@ bool DirectoryScanner::IsStopRequested() const
 {
     return m_stopRequested;
 }
-`
-`
+```
+```cpp
 void DirectoryScanner::ScanRecursive(const std::wstring& path)
 {
     if (IsStopRequested()) return;
@@ -254,13 +254,13 @@ void DirectoryScanner::ScanRecursive(const std::wstring& path)
     // FindFirstFile ~ FindNextFile 루프
     // 각 항목 처리 전에/후에 stop 체크
 }
-`
+```
 - 강제로 스레드를 Kill하는 방식이 아니라 **"협조적인 종료(cooperative cancel)"를 선택해서,
   **리소스 정리**나 **메모리 해제 순서**가 꼬이지 않도록 했다.
 
 ✔️**DFS 기반 재귀 탐색**
 탐색은 **DFS(Depth-First Search)를 재귀로 구현했다.**
-`
+```cpp
 void DirectoryScanner::StartScan()
 {
     m_processedCount = 0;
@@ -271,7 +271,7 @@ void DirectoryScanner::StartScan()
         m_pNotifyWnd->PostMessage(WM_SCAN_FINISHED, 0, 0);
     }
 }
-`
+```
 void DirectoryScanner::ScanRecursive(const std::wstring& path)
 {
     if (IsStopRequested()) return;
@@ -322,7 +322,7 @@ void DirectoryScanner::ScanRecursive(const std::wstring& path)
         PostBatch(batch);
     }
 }
-`
+```
 별도의 거대한 트리를 만들지 않고,
 "**방문하는 디렉터리에서 바로바로 처리하고 내려가고, 스택에서 빠지면 끝나면 구조**"로 구현해서
   - 메모리 사용량을 줄이고,
@@ -351,7 +351,7 @@ void DirectoryScanner::ScanRecursive(const std::wstring& path)
   - 리스트뷰 최대 행 수
     - `m_maxDisplayCount = 5000` 정도로 제한
 
-`
+```cpp
 void CDirSizeVisualizerDlg::UpdateListView(const std::vector<ScanResult>& results)
 {
     for (const auto& r : results) {
@@ -370,7 +370,7 @@ void CDirSizeVisualizerDlg::UpdateListView(const std::vector<ScanResult>& result
         ++m_totalProcessed;
     }
 }
-`
+```
 ➡ 이 샘플링과 제한을 적용한 뒤에는
 - UI가 훨씬 가볍게 유지되면서도,
 - "어느 폴더에 큰 파일이 많은지"같은 **탐색 도구로서의 목적은 충분히 달성**할 수 있었다.
@@ -387,7 +387,7 @@ void CDirSizeVisualizerDlg::UpdateListView(const std::vector<ScanResult>& result
 - 진행률을 **로그 스케일 느낌**으로 바꿨다.
 
 예시)
-`
+```cpp
 int CDirSizeVisualizerDlg::CalcProgress(ULONGLONG processed)
 {
     if (processed == 0) return 0;
@@ -397,7 +397,7 @@ int CDirSizeVisualizerDlg::CalcProgress(ULONGLONG processed)
     if (progress > 100) progress = 100;
     return progress;
 }
-`
+```
 - 정확한 수치는 프로젝트를 진행하며 여러 번 찍어보면서 조정했다.
 - 핵심은
   - 초반에 너무 빨리 90%까지 가 버리지 않고,
@@ -421,7 +421,7 @@ int CDirSizeVisualizerDlg::CalcProgress(ULONGLONG processed)
   `new`는 워커 한 번, `delete`는 UI 한 번"같이 단순하게 정리했다.
 - 구현 패턴을 **항상 같은 형태**로 유지
 
-`
+```cpp
 // 워커
 ScanUpdateInfo* info = new ScanUpdateInfo;
 // 데이터 채우기
@@ -434,7 +434,7 @@ LRESULT OnScanUpdate(WPARAM, LPARAM lParam)
     // 사용
     delete info;
 }
-`
+```
 - 다른 곳에서 `ScanUpdateInfo*`를 멤버로 보관하거나,
   여러 번 `delete` 할 수 있는 여지를 애초에 만들지 않았다.
 ➡ 이 규칙을 스스로 강제하면서
