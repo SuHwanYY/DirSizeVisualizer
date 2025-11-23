@@ -105,7 +105,7 @@ struct ScanUpdateInfo {
 - **워커 스레드** : `ScanUpdateInfo* info = new ScanUpdateInfo;` ➡ 데이터 채우고 ➡ `PostMessage`
 - **UI 스레드** : 메시지 핸들러에서 `ScanUpdateInfo*`를 받아 사용 후 반드시 `delete`
 
-##💡클래스를 2개만 분리한 이유
+## 💡클래스를 2개만 분리한 이유
 
 처음에는 `ListViewManager`, `ProgressStatus`, `ScanController`같은 클래스를 더 쪼갤까도 고민했다.
 하지만 실제로 구현을 진행하면서,
@@ -128,7 +128,7 @@ struct ScanUpdateInfo {
 
 # 주요 구현(수동 메모리, 멀티스레드, DFS 재귀)
 
-##✔️스마트 포인터 대신 수동 메모리 관리
+## ✔️스마트 포인터 대신 수동 메모리 관리
 
 이번 과제에서는 **스마트 포인터를 일부러 쓰지 않고,**  
 멀티스레드 환경에서 `new`/`delete`를 직접 관리해 보는 연습을 했다.
@@ -184,7 +184,7 @@ bool              m_isScanning = false;
   - `m_pScanThread`는 MFC가 관리하지만, 필요 시 nullptr로 초기화.  
 **스마트 포인터가 없는 상태에서 이런 수동 규칙을 직접 잡아보는 게 이번 과제의 핵심 중 하나였다.**
 
-##✔️멀티스레드 구조
+## ✔️멀티스레드 구조
 
 - **1. 스레드 시작**
 ```cpp
@@ -262,7 +262,7 @@ void DirectoryScanner::ScanRecursive(const std::wstring& path)
 - 강제로 스레드를 Kill하는 방식이 아니라 **"협조적인 종료(cooperative cancel)"를 선택해서,  
   **리소스 정리**나 **메모리 해제 순서**가 꼬이지 않도록 했다.
 
-##✔️DFS 기반 재귀 탐색
+## ✔️DFS 기반 재귀 탐색
 
 탐색은 **DFS(Depth-First Search)를 재귀로 구현했다.**
 ```cpp
@@ -338,7 +338,7 @@ void DirectoryScanner::ScanRecursive(const std::wstring& path)
 
 ## 구현하면서 겪은 어려움과 해결 과정
 
-##✔️리스트뷰에 모든 항목을 다 넣었을 때의 성능 문제
+## ✔️리스트뷰에 모든 항목을 다 넣었을 때의 성능 문제
 
 **문제**
 - 처음 구현은
@@ -382,7 +382,7 @@ void CDirSizeVisualizerDlg::UpdateListView(const std::vector<ScanResult>& result
 - UI가 훨씬 가볍게 유지되면서도,
 - "어느 폴더에 큰 파일이 많은지"같은 **탐색 도구로서의 목적은 충분히 달성**할 수 있었다.
 
-##✔️ProgressBar가 끝까지 안 차는 것처럼 보이는 문제
+## ✔️ProgressBar가 끝까지 안 차는 것처럼 보이는 문제
 
 **문제**
 - 처음엔 `processedCount`를 그대로 퍼센트로 환산해서 ProgressBar를 업데이트하려고 했다.
@@ -414,7 +414,7 @@ int CDirSizeVisualizerDlg::CalcProgress(ULONGLONG processed)
 탐색이 오래 걸려도 ProgressBar가 조금씩 꾸준히 움직여서,  
 사용자 경험이 훨씬 낫다고 느꼈다.
 
-##✔️워커 스레드와 UI 스레드 사이의 메모리 관리
+## ✔️워커 스레드와 UI 스레드 사이의 메모리 관리
 
 **문제**
 - 멀티스레드에서 `new`/`delete`를 직접 쓰다 보내ㅣ,
@@ -449,7 +449,7 @@ LRESULT OnScanUpdate(WPARAM, LPARAM lParam)
 ➡ 이 규칙을 스스로 강제하면서  
 **"멀티스레드 + 수동 메모리 관리에서 가장 위험한 부분을 직접 컨트롤해봤다"는 경험을 얻을 수 있었다.**
 
-##✔️중지 기능 구현 방식 선택
+## ✔️중지 기능 구현 방식 선택
 
 **문제**
 - 중지를 구현할 때
@@ -472,7 +472,7 @@ LRESULT OnScanUpdate(WPARAM, LPARAM lParam)
 ➡ 이 과정 덕분에,  
 "멀티스레드에서 강제 종료 대신 플래그로 종료를 설계하는 패턴"을 직접 체감할 수 있었다.
 
-##✔️그 외 자잘한 시행착오들
+## ✔️그 외 자잘한 시행착오들
 
 - **경로 라벨(`탐색 경로:`)과 실제 입력 경로 동기화**
   - 시작 버튼을 누를 때마다 라벨을 현재 입력 경로로 갱신해 줘야 해서,
