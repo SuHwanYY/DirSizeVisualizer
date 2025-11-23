@@ -408,8 +408,8 @@ int CDirSizeVisualizerDlg::CalcProgress(ULONGLONG processed)
 ```
 - 정확한 수치는 프로젝트를 진행하며 여러 번 찍어보면서 조정했다.
 - 핵심은
-  - 초반에 너무 빨리 90%까지 가 버리지 않고,
-  - 끝날 때쯤 100% 근처로 모이게 만드는 감각적인 튜팅이었다.
+  - 초반에 너무 빨리 90%까지 가버리지 않고,
+  - 끝날 때쯤 100% 근처로 모이게 만드는 감각적인 튜닝이었다.
 ➡ 이렇게 바꾸고 나서는  
 탐색이 오래 걸려도 ProgressBar가 조금씩 꾸준히 움직여서,  
 사용자 경험이 훨씬 낫다고 느꼈다.
@@ -417,7 +417,7 @@ int CDirSizeVisualizerDlg::CalcProgress(ULONGLONG processed)
 ## ✔️워커 스레드와 UI 스레드 사이의 메모리 관리
 
 **문제**
-- 멀티스레드에서 `new`/`delete`를 직접 쓰다 보내ㅣ,
+- 멀티스레드에서 `new`/`delete`를 직접 쓰다 보니,
   - "이 포인터를 누가 지우지?"
   - "여기서 지우면 다른 스레드에서 또 건드리는 건 아닐까"같은 걱정이 계속 들었다.
 - 특히 `ScanUpdateInfo`같은 구조체는
