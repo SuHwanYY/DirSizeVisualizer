@@ -279,7 +279,7 @@ void DirectoryScanner::StartScan()
     m_processedCount = 0;
     ScanRecursive(m_rootPath);
 
-    // 탐색 종료 시에 UI에 알림림
+    // 탐색 종료 시에 UI에 알림
     if (m_pNotifyWnd) {
         m_pNotifyWnd->PostMessage(WM_SCAN_FINISHED, 0, 0);
     }
