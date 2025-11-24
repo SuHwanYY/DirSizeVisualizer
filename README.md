@@ -1,3 +1,5 @@
+<img width="1919" height="1031" alt="delete 지우기 전" src="https://github.com/user-attachments/assets/8f1364e2-c1d4-49be-ba83-99909451f261" />
+
 # 프로젝트 소개
 - 원하는 경로 안의 파일의 크기를 모두 탐색해 주는 **디렉터리 크기 시각화 툴**
 - 시작 버튼을 통해 탐색을 시작하며 중지 버튼을 통해 중단할 수 있다.
