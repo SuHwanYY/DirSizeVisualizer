@@ -442,7 +442,7 @@ LRESULT OnScanUpdate(WPARAM, LPARAM lParam)
         
     - `ScanResult`가 어느 정도 쌓이면
       - `ScanUpdateInfo`를 `new`로 하나 만들고
-      - `WM_SCAN_UPDATE` 메시지와 함께 UI 스레드로 보내 화면을 갱신한다.
+      - `WM_SCAN_UPDATE` 메시지와 함께 UI 스레드로 보내 화면을 갱신합니다.
         
     - 탐색 도중에 중지 플래그를 계속 확인해서  
       중지 요청이 들어오면 바로 빠져나올 수 있게 만듭니다.
