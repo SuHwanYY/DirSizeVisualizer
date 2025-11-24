@@ -291,8 +291,8 @@ void DirectoryScanner::ScanRecursive(const std::wstring& path)
 
 - **멀티스레드**
   - `OnBnClickedButtonStart`에서 `aFxBeginThread(&ScanTrheadProc, this)`를 사용
-<img width="1469" height="272" alt="멀티스레드 실행 시간" src="https://github.com/user-attachments/assets/738fcd6b-217d-4a69-966a-68366fe56801" />
-- 진단 세션: **12.6초**
+<img width="1474" height="280" alt="멀티스레드 실행 시간" src="https://github.com/user-attachments/assets/0be92b7d-4119-41e7-bb6e-bb6a5a0333b2" />
+- 진단 세션: **11.079초**
 
 - **단일 스레드**
   - 같은 위치에서 `ScanThreadProc(this);`를 직접 호출하도록 변경하여 실행
