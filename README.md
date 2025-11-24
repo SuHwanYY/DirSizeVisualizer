@@ -9,6 +9,7 @@
 
 # 결과 화면
 <img width="557" height="377" alt="DirSizeVisualizer 실행 사진" src="https://github.com/user-attachments/assets/73592858-d7b9-4610-a51c-2a8aa59b881d" />
+
 - 시작 버튼을 통해 탐색을 시작하며 중지 버튼을 통해 중단할 수 있습니다.
 - progress bar를 통해 진행도를 보여줍니다.
 - 탐색이 끝난 후에는 해당 경로의 총 크기를 Byte단위로 볼 수 있고, 파일 목록을 볼 수 있습니다.
