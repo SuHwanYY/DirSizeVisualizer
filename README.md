@@ -32,8 +32,8 @@
 
 **3. Stop 버튼**
   - 워커 스레드 내부에 **중단 플래그**를 세우도록 구현
-  - 워커 스레드는 각 디렉터리 진입/파일 처리 시 플래그를 확인하고 안전하게 종료
-  - 종료 후 `WM_SCAN_FINISHED`를 통해 UI에서 상태 정리
+  - 워커 스레드는 폴더 탐색 / 파일 처리 중에 중지 요청 플래그를 계속 확인하다가, 요청이 들어오면 작업을 정리하고 종료
+  - 종료 후에는 `WM_SCAN_FINISHED` 메시지로 UI에 알려서 버튼 상태나 진행 표시를 다시 정리
 
 **4. ProgressBar**
   - 단순한 **선형 스케일**(전체 파일 수 대비 얼마나 처리했는지)이 아닌, **로그 스케일 기반으로 값 갱신**
@@ -62,44 +62,51 @@
 ## ✔️CDirSizeVisualizerDlg(UI & 제어 담당)
   - **하는 일**
     - 경로 입력 에딧, 시작/중비 버튼, 리스트뷰, ProgressBar, 상태 텍스트, `탐색 경로:` 라벨 등 **UI 전체 관리**
+    
     - **"시작" 버튼 클릭 시**
       - 입력된 경로를 읽고,
       - `DirectoryScanner`를 생성한 뒤,
       - `AfxBeginThread`로 워커 스레드를 만들어 탐색 시작.
+    
     - **"중지" 버튼 클릭 시**
       - 워커 스레드가 사용 중인 `DirectoryScanner에 **중지 요청 플래그**를 세움.
     - 워커 스레드에서 보내는
       - `WM_SCAN_UPDATE` 메시지 ➡ 리스트뷰/ProgressBar 갱신
       - `WM_SCAN_FINISHED` 메시지 ➡ 버튼 상태 복구, "완료/중지됨" 텍스트 출력, 스레드 정리.
-    - **한 줄 정리**
-      - **"UI + 스레드 라이프사이클 + 표시/정렬만 담당하는 레이어".**
-   
 
 ## ✔️DirectoryScanner(디렉터리 탐색 담당)
   - 실제 디렉터리/파일을 읽고 크기를 계산하는 **핵심 로직 클래스**
   - **하는 일**
-    - 시작 경로(기본 `C:\`)부터 **DFS 기반 재귀 탐색**으로 모든 하위 폴더/파일 순회.
+    - 시작 경로(기본값은 `C:\`)에서 출발해서  
+      **재귀 호출**로 폴더를 계속 파고들어 모든 하위 폴더/파일을 돌며 검사한다.
+      
     - 각 항목에 대해
-      - 이름, 타입(파일/디렉터리), 크기, 전체 경로를 계산해 `ScanResult` 구조체에 담음.
-    - 일정 개수의 `ScanResult`가 모이면
-      - `ScanUpdateInfo`를 `new`로 할당해서
-      - `WM_SCAN_UPDATE` 메시지로 UI 스레드에 전달.
-    - 중지 요청 플래그를 주기적으로 확인해 **안전하게 탐색을 빠져나올 수 있게**함.
-    - 탐색이 끝나면 마지막으로 `WM_SCAN_FINISHED` 메시지 전송.
+      - 이름, 타입(파일/디렉터리), 크기, 전체 경로를 계산해서  
+        `ScanResult`구조체 하나에 담는다.
+        
+    - `ScanResult`가 어느 정도 쌓이면
+      - `ScanUpdateInfo`를 `new`로 하나 만들고
+      - `WM_SCAN_UPDATE` 메시지와 함께 UI 스레드로 보내 화면을 갱신한다.
+        
+    - 탐색 도중에 중지 플래그를 계속 확인해서
+      중지 요청이 들어오면 바로 빠져나올 수 있게 만든다.
+      
+    - 모든 탐색이 끝나면 마지막으로 `WM_SCAN_FINISHED` 메시지를 보내서
+      UI 쪽에서 "끝났다"는 걸 알 수 있게 한다.
  
 ## 💡공용 데이터 구조(간략하게)
 
 ```cpp
 struct ScanResult {
-  std::wstring name;      // 파일/폴더 이름
-  std::wstring type;      // "File" or "Directory"
-  ULONGLONG size;         // 바이트 단위 크기
-  std::wstring fullPath;  // 전체 경로
+  std::wstring name;      // 파일 및 폴더 이름
+  std::wstring type;      // 타입
+  ULONGLONG size;         // 크기(byte)
+  std::wstring fullPath;  // 경로
   };
 
 struct ScanUpdateInfo {
-  std::vector<ScanResult> results;   // 이번 배치에 추가된 항목들
-  ULONGLONG processedCount = 0;      // 지금까지 처리한 전체 개수
+  std::vector<ScanResult> results;   // 추가된 항목 배열
+  ULONGLONG processedCount = 0;      // 처리한 수
 };
 ```
 - **워커 스레드** : `ScanUpdateInfo* info = new ScanUpdateInfo;` ➡ 데이터 채우고 ➡ `PostMessage`
@@ -109,20 +116,15 @@ struct ScanUpdateInfo {
 
 처음에는 `ListViewManager`, `ProgressStatus`, `ScanController`같은 클래스를 더 쪼갤까도 고민했다.
 하지만 실제로 구현을 진행하면서,
-- 프로젝트 규모가 **"MFC 다이얼로그 + DFS 탐색기"** 수준이고,
-- 멀티스레드/메시지 처리 흐름만 잘 잡으면 구조가 이미 충분히 명확했으며,
+- 프로젝트 규모가 큰 수준이 아니고
 - 클래스를 더 쪼개면
   - 파일 수는 늘어나는데,
   - **실제 이해도/가독성은 크게 좋아지지 않고,**
-  - 오히려 흐름을 한 번 더 타고 들어가 봐야 하는 레벨이 생겨서 디버깅이 불편해질 수 있었다.
+  - 오히려 흐름을 한 번 더 타고 들어가 봐야 하는 일이 생겨서 디버깅이 불편해질 수 있었다.
 그래서 최종적으로는,
 - **UI/스레드 제어/표시 =** `CDirSizeVisualizerDlg`
 - **실제 디렉터리 스캔 로직 =** `DirectoryScanner`
 라는 **2계층 구조**로 정리했다.
-
-- 위와 같은 분리는
-  - "UI 코드와 비즈니스 로직 분리"라는 목적을 달성하면서도,
-  - 과도한 추상화 없이 자연스럽다고 판단했다.
 
 ---
 
