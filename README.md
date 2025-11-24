@@ -283,6 +283,26 @@ void DirectoryScanner::ScanRecursive(const std::wstring& path)
 - 스레드를 강제로 종료하는 대신,
   **중지 신호만 보내고 스레드가 스스로 정리하면서 끝나도록 하는 방식**을 사용했다.
 
+### 🔍멀티스레드 VS 단일 스레드 성능/체감 비교
+멀티스레드와 단일스레드의 차이를 비교해보기 위해,
+같은 경로를 대상으로 각각 탐색을 진행해보았다.
+
+- **멀티스레드**
+  - `OnBnClickedButtonStart`에서 `aFxBeginThread(&ScanTrheadProc, this)`를 사용
+<img width="1469" height="272" alt="멀티스레드 실행 시간" src="https://github.com/user-attachments/assets/738fcd6b-217d-4a69-966a-68366fe56801" />
+- 진단 세션: **12.6초**
+
+- **단일 스레드**
+  - 같은 위치에서 `ScanThreadProc(this);`를 직접 호출하도록 변경하여 실행
+<img width="1472" height="275" alt="싱글스레드 실행 시간" src="https://github.com/user-attachments/assets/7acd8e51-6efd-4ce5-940b-361a6d87a3fc" />
+- 진단 세션: **14.7초**
+
+- **결론**
+  - 순수 실행 시간만 본다면 두 모드의 차이는 크지 않았지만,
+  - 단일 스레드 모드에서는 탐색 시작 시 **UI가 완전히 멈춘 후** 탐색 종료 직전에 반응이 돌아왔다.
+ 
+**실행 시간을 줄이는 것뿐 아니라, UI 응답성을 지키기 위해서도 워커 스레드가 필요하다는 점을 확인할 수 있었다.**
+
 ## ✔️DFS 기반 재귀 탐색
 
 탐색은 **DFS(Depth-First Search)를 재귀 호출로 구현했다.**
