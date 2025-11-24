@@ -186,6 +186,7 @@ bool              m_isScanning = false;
   - `m_pScanThread`는 MFC가 관리하지만, 필요 시 nullptr로 초기화.  
 **스마트 포인터가 없는 상태에서 이런 수동 규칙을 직접 잡아보는 게 이번 과제의 핵심 중 하나였다.**
 
+
 ### 🔍delete 유무에 따른 메모리 사용 비교
 위 `OnScanUpdate`에서 `delete info;` 한 줄을 기준으로 메모리 사용량이 어떻게 달라지는지 프로파일러로 비교해 보았다.  
 경로 탐색을 한 번 실행했을 때도 차이가 있었지만,  
@@ -282,6 +283,7 @@ void DirectoryScanner::ScanRecursive(const std::wstring& path)
 ```
 - 스레드를 강제로 종료하는 대신,
   **중지 신호만 보내고 스레드가 스스로 정리하면서 끝나도록 하는 방식**을 사용했다.
+
 
 ### 🔍멀티스레드 VS 단일 스레드 성능/체감 비교
 멀티스레드와 단일스레드의 차이를 비교해보기 위해,
