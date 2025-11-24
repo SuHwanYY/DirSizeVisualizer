@@ -466,7 +466,7 @@ struct ScanUpdateInfo {
 };
 ```
 
-## 💡클래스를 2개만 분리한 이유
+## 클래스를 2개만 분리한 이유
 
 처음에는 `ListViewManager`, `ProgressStatus`, `ScanController`같은 클래스를 더 쪼갤까도 고민했습니다.  
 하지만 실제로 구현을 진행하면서,
