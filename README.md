@@ -134,12 +134,12 @@ struct ScanUpdateInfo {
 
 이번 과제에서는 **스마트 포인터를 일부러 쓰지 않고,**  
 멀티스레드 환경에서 `new`/`delete`를 직접 관리해 보는 연습을 했다.
-<br>
+
 핵심 패턴은 다음 두 가지였다.
-<br>
+
 **1. 워커 스레드 ➡ UI 스레드로 데이터를 넘길 때**
 ```cpp
-// DirectoryScanner 내부 (워커 스레드)
+// DirectoryScanner 쪽 코드 (작업용 스레드에서 동작)
 void DirectoryScanner::PostBatch(const std::vector<ScanResult>& batch) {
     if (batch.empty() || m_pNotifyWnd == nullptr) return;
 
@@ -151,21 +151,21 @@ void DirectoryScanner::PostBatch(const std::vector<ScanResult>& batch) {
 }
 ```
 ```cpp
-// CDirSizeVisualizerDlg 메시지 핸들러 (UI 스레드)
+// CDirSizeVisualizerDlg에서 WM_SCAN_UPDATE를 받을 때 호출되는 함수(UI 스레드)
 LRESULT CDirSizeVisualizerDlg::OnScanUpdate(WPARAM, LPARAM lParam)
 {
     ScanUpdateInfo* info = reinterpret_cast<ScanUpdateInfo*>(lParam);
     if (info == nullptr) return 0;
 
-    // 리스트뷰 / ProgressBar 업데이트
+    // 하면에 리스트와 progressbar를 반영
     UpdateListView(info->results);
     UpdateProgressBar(info->processedCount);
 
-    delete info;  // 여기서 반드시 delete
+    delete info;  // 다 쓴 info는 여기서 메모리 해제
     return 0;
 }
 ```
-- **소유권 규칙**을 명확히 정했다.
+- **포인터를 누가 책임지는지** 규칙을 정해 두었다.
   - `new`는 워커 스레드에서만.
   - `delete`는 UI 스레드 메시지 핸들러에서만.
 - 이 규칙 덕분에
@@ -190,10 +190,10 @@ bool              m_isScanning = false;
 
 - **1. 스레드 시작**
 ```cpp
-// 시작 버튼 핸들러
+// 시작 버튼을 눌렀을 때 호출되는 핸들러
 void CDirSizeVisualizerDlg::OnBnClickedButtonStart()
 {
-    if (m_isScanning) return;
+    if (m_isScanning) return;  // 이미 탐색 중이면 무시
 
     CString path;
     m_editPath.GetWindowText(path);
@@ -201,14 +201,14 @@ void CDirSizeVisualizerDlg::OnBnClickedButtonStart()
         path = L"C:\\";
     }
 
-    // 기존 스캐너 정리
+    // 혹시 남아 있을 수 있는 이전 스캩너 정리
     delete m_scanner;
     m_scanner = nullptr;
 
     // 새 스캐너 생성
     m_scanner = new DirectoryScanner(path, this);
 
-    // UI 상태 초기화
+    // UI 상태를 처음 상태로 초기화
     ResetUIForStart(path);
 
     // 워커 스레드 시작
@@ -217,14 +217,15 @@ void CDirSizeVisualizerDlg::OnBnClickedButtonStart()
 }
 ```
 ```cpp
-// 정적 스레드 함수
+// 워커 스레드 진입 함수(정적 함수여야 함)
 UINT CDirSizeVisualizerDlg::ScanThreadProc(LPVOID pParam)
 {
     auto* pDlg = reinterpret_cast<CDirSizeVisualizerDlg*>(pParam);
     if (pDlg == nullptr || pDlg->m_scanner == nullptr) return 0;
 
+    // 실제 탐색은 DirectoryScanner에 맡긴다
     pDlg->m_scanner->StartScan();
-    // Scan이 끝나면 DirectoryScanner 내부에서 WM_SCAN_FINISHED 전송
+    // 탐색이 끝나면 DirectoryScanner 내부에서 WM_SCAN_FINISHED를 전송
 
     return 0;
 }
@@ -232,16 +233,18 @@ UINT CDirSizeVisualizerDlg::ScanThreadProc(LPVOID pParam)
 
 - **2. 중지 버튼 &  안전한 종료**
 ```cpp
+// 중지 버튼을 눌렀을 때 호출되는 핸들러
 void CDirSizeVisualizerDlg::OnBnClickedButtonStop()
 {
     if (!m_isScanning || m_scanner == nullptr) return;
 
-    m_scanner->RequestStop();   // stop 플래그만 세움
-    // 실제 종료는 워커 스레드가 재귀를 빠져나오면서 자연스럽게 끝남
+    // 바로 스레드를 죽이지 않고, 그만하라는 신호를 보냄
+    m_scanner->RequestStop();
+    // 실제 종료는 워커 스레드가 재귀를 빠져나오면서 자연스럽게 종료
 }
 ```
 ```cpp
-// DirectoryScanner 내부
+// DirectoryScanner 내부 - 중지 요청을 기록
 void DirectoryScanner::RequestStop()
 {
     m_stopRequested = true;
@@ -253,27 +256,30 @@ bool DirectoryScanner::IsStopRequested() const
 }
 ```
 ```cpp
+// 재귀적으로 폴더를 도는 핵심 함수
 void DirectoryScanner::ScanRecursive(const std::wstring& path)
 {
+    // 먼저 중지 요청이 들어왔는지 확인
     if (IsStopRequested()) return;
 
     // FindFirstFile ~ FindNextFile 루프
-    // 각 항목 처리 전에/후에 stop 체크
+    // 각 항목을 처리하기 전/후에 stop 플래그를 다시 확인해서
+    // 요청이 들어오면 그 지점에서 깔끔하게 빠져나오도록 한다
 }
 ```
-- 강제로 스레드를 Kill하는 방식이 아니라 "**협조적인 종료(cooperative cancel)**"를 선택해서,  
-  **리소스 정리**나 **메모리 해제 순서**가 꼬이지 않도록 했다.
+- 스레드를 강제로 종료하는 대신,
+  **중지 신호만 보내고 스레드가 스스로 정리하면서 끝나도록 하는 방식**을 사용했다.
 
 ## ✔️DFS 기반 재귀 탐색
 
-탐색은 **DFS(Depth-First Search)를 재귀로 구현했다.**
+탐색은 **DFS(Depth-First Search)를 재귀 호출로 구현했다.**
 ```cpp
 void DirectoryScanner::StartScan()
 {
     m_processedCount = 0;
     ScanRecursive(m_rootPath);
 
-    // 탐색 종료 알림
+    // 탐색 종료 시에 UI에 알림림
     if (m_pNotifyWnd) {
         m_pNotifyWnd->PostMessage(WM_SCAN_FINISHED, 0, 0);
     }
@@ -316,7 +322,7 @@ void DirectoryScanner::ScanRecursive(const std::wstring& path)
             batch.clear();
         }
 
-        // 디렉터리라면 재귀 호출
+        // 폴더라면 안으로 한 번 더 들어감
         if (isDir) {
             ScanRecursive(fullPath);
         }
@@ -325,16 +331,16 @@ void DirectoryScanner::ScanRecursive(const std::wstring& path)
 
     ::FindClose(hFind);
 
-    // 남은 배치 처리
+    // 남은 항목도 한 번 더 보내기
     if (!batch.empty()) {
         PostBatch(batch);
     }
 }
 ```
-별도의 거대한 트리를 만들지 않고,  
-"**방문하는 디렉터리에서 바로바로 처리하고 내려가고, 스택에서 빠지면 끝나면 구조**"로 구현해서  
-  - 메모리 사용량을 줄이고,
-  - 탐색 로직을 단순하게 유지했다.
+💡 따로 거디한 트리를 만들어서 모두 들고 있지 않고,  
+  디렉터리를 방문할 때마다 바로 처리하고 안쪽으로 내려갔다가  
+  재귀가 끝나면 그대로 스택에서 빠져 나오게 만드는 방식이라  
+  메모리를 덜 쓰고, 전체 로직도 비교적 단순하게 유지할 수 있었다.
 
 ---
 
@@ -343,22 +349,22 @@ void DirectoryScanner::ScanRecursive(const std::wstring& path)
 ## ✔️리스트뷰에 모든 항목을 다 넣었을 때의 성능 문제
 
 **문제**
-- 처음 구현은
-  - 워커 스레드에서 오는 `ScanUpdateInfo`의 `results`를 **모두 리스트뷰에 추가**하는 방식이었다.
-- `C:\` 전체를 탐색하면
+- 처음에는
+  - 워커 스레드에서 오는 `ScanUpdateInfo::results`안에 있는 항목들을 **모두 리스트뷰에 추가**하는 방식이었다.
+- 그런데 `C:\` 처럼 큰 경로를 돌리면
   - 수만~수십만 개의 항목이 들어올 수 있고,
   - 리스트뷰에 항목을 계속 추가하다 보니
     - UI가 심하게 버벅이고,
-    - 탐색이 끝난 뒤에도 스크롤이 답답할 정도로 무거워졌다.
+    - 탐색이 끝난 뒤에도 스크롤이 너무 무거워지는 문제가 생겼다.
 
 **해결**
 - "모든 항목을 보여주는 게 중요한 게 아니라, **대략적인 분포와 큰 파일**만 보여주면 된다"는 방향으로 바꿨다.
   - **처음 500개 항목** ➡ 전부 표시
   - 그 이후부터는
     - `processedCount` 기준으로
-    - **일정 간격(예:500개마다)** 하나씩만 샘플링해서 표시
-  - 리스트뷰 최대 행 수
-    - `m_maxDisplayCount = 5000` 정도로 제한
+    - **예를 들어 500개마다 하나씩만** 하나씩만 샘플링해서 리스트에 추가했다.
+  - 리스트뷰 최대 행 수도
+    - `m_maxDisplayCount = 5000` 정도로 제한을 두었다.
 
 ```cpp
 void CDirSizeVisualizerDlg::UpdateListView(const std::vector<ScanResult>& results)
@@ -380,14 +386,15 @@ void CDirSizeVisualizerDlg::UpdateListView(const std::vector<ScanResult>& result
     }
 }
 ```
-➡ 이 샘플링과 제한을 적용한 뒤에는
+➡ 이렇게 **샘플링 + 최대 개수 제한**을 걸어 준 뒤에는
 - UI가 훨씬 가볍게 유지되면서도,
-- "어느 폴더에 큰 파일이 많은지"같은 **탐색 도구로서의 목적은 충분히 달성**할 수 있었다.
+- "어느 폴더에 큰 파일이 많은지",
+  "어디에 큰 파일이 있는지"같은 정보는 충분히 확인할 수 있었다.
 
 ## ✔️ProgressBar가 끝까지 안 차는 것처럼 보이는 문제
 
 **문제**
-- 처음엔 `processedCount`를 그대로 퍼센트로 환산해서 ProgressBar를 업데이트하려고 했다.
+- 처음엔 `processedCount`를 그대로 비율로 계산해서 ProgressBar를 업데이트하려고 했다.
   - 하지만 전체 파일 개수를 정확히 알 수 없고,
   - 디렉터리 깊이에 따라 처리 시간이 크게 달라져서,
   - 초반에는 빠르게 올라가다가 **어느 순간 거의 안 움직이는 것처럼 느껴지는** 문제가 있었다.
@@ -404,7 +411,7 @@ int CDirSizeVisualizerDlg::CalcProgress(ULONGLONG processed)
     if (processed == 0) return 0;
 
     double v = std::log10(static_cast<double>(processed) + 1.0);
-    int progress = static_cast<int>(v * 20); // 값은 프로젝트에 맞게 튜닝
+    int progress = static_cast<int>(v * 20); // 프로젝트 상황에 맞게 튜닝
     if (progress > 100) progress = 100;
     return progress;
 }
@@ -412,10 +419,10 @@ int CDirSizeVisualizerDlg::CalcProgress(ULONGLONG processed)
 - 정확한 수치는 프로젝트를 진행하며 여러 번 찍어보면서 조정했다.
 - 핵심은
   - 초반에 너무 빨리 90%까지 가버리지 않고,
-  - 끝날 때쯤 100% 근처로 모이게 만드는 감각적인 튜닝이었다.
+  - 끝날 때쯤 100% 근처로 모이게 만드는 것이었다.
+
 ➡ 이렇게 바꾸고 나서는  
-탐색이 오래 걸려도 ProgressBar가 조금씩 꾸준히 움직여서,  
-사용자 경험이 훨씬 낫다고 느꼈다.
+탐색이 오래 걸려도 ProgressBar가 조금씩 꾸준히 움직이게 되었다.
 
 ## ✔️워커 스레드와 UI 스레드 사이의 메모리 관리
 
@@ -423,34 +430,42 @@ int CDirSizeVisualizerDlg::CalcProgress(ULONGLONG processed)
 - 멀티스레드에서 `new`/`delete`를 직접 쓰다 보니,
   - "이 포인터를 누가 지우지?"
   - "여기서 지우면 다른 스레드에서 또 건드리는 건 아닐까"같은 걱정이 계속 들었다.
-- 특히 `ScanUpdateInfo`같은 구조체는
-  - 워커 스레드에서 생성해서
-  - UI 스레드에서 해제해야 하므로
-  - **소유권 규칙을 조금만 헷갈리면 메모리 누수나 double free 위험**이 있다.
+
+- 특히 `ScanUpdateInfo`처럼
+  - 워커 스레드에서 만들고
+  - UI 스레드에서 해제해야 하는 구조체는
+  - **소유권 규칙을 조금만 헷갈리면 메모리 누수나 double free가 날 수 있는** 부분이었다.
  
 **해결**
-- "스레드 간 데이터를 건널 때는 항상 `ScanUpdateInfo*`로 보내고,  
-  `new`는 워커 한 번, `delete`는 UI 한 번"같이 단순하게 정리했다.
-- 구현 패턴을 **항상 같은 형태**로 유지
+- 스레드 사이에 넘기는 데이터는 항상 `ScanUpdateInfo*` 한 방향으로만 흐르도록 정리했다.
+  - `new`는 워커 스레드에서만,
+  - `delete`는 UI 스레드의 메시지 핸들러에서만 넘기도록 했다.
 
+- 패턴은 항상 같은 모양을 유지했다.
 ```cpp
-// 워커
+// 워커 스레드 쪽
 ScanUpdateInfo* info = new ScanUpdateInfo;
 // 데이터 채우기
 PostMessage(..., reinterpret_cast<LPARAM>(info));
 
-// UI
+// UI 스레드 쪽
 LRESULT OnScanUpdate(WPARAM, LPARAM lParam)
 {
     auto* info = reinterpret_cast<ScanUpdateInfo*>(lParam);
-    // 사용
-    delete info;
+    if (!info) return 0;
+
+    // 데이터 사용
+    UpdateListView(info->results);
+    UpdateProgressBar(info->processedCount);
+
+    delete info;  // 여기서 한 번만 해제
+    return 0;
 }
 ```
-- 다른 곳에서 `ScanUpdateInfo*`를 멤버로 보관하거나,  
-  여러 번 `delete` 할 수 있는 여지를 애초에 만들지 않았다.
-➡ 이 규칙을 스스로 강제하면서  
-**"멀티스레드 + 수동 메모리 관리에서 가장 위험한 부분을 직접 컨트롤해봤다"는 경험을 얻을 수 있었다.**
+- `ScanUpdateInfo*`를 다른 멤버 변수에 따로 보관해서 여러 군데에서 건드리거나,
+  두 번 이상 `delete`할 수 있는 여지를 만들지 않았다.
+
+➡ 이러한 과정을 통해서 **멀티스레드**와 **수동 메모리 관리**에서 신경써야 될 부분을 체감해 볼 수 있었다.
 
 ## ✔️중지 기능 구현 방식 선택
 
@@ -460,35 +475,35 @@ LRESULT OnScanUpdate(WPARAM, LPARAM lParam)
   - 그렇게 하면
     - 현재 실행 중인 함수가 어디까지 갔는지 모르는 상태에서 끊기기 때문에
     - 핸들/파일/포인터 정리가 꼬일 수 있다.
-  - DFS 재귀 구조라서,
-    - 깊은 디렉터리 안쪽에서 멈추면 스택이 어떻게 남는지 신경 쓸 포인트가 많았다.
+
+  - 게다가 DFS 재귀 구조라서,
+    - 깊은 폴더 안쪽에서 갑자기 끊어지면 **스택이 어떤 상태로 남는지도** 신경써야 했다.
 
 **해결**
 - 강제 종료는 사용하지 않고,
-  - `DirectoryScanner` 내부에 `m_stopRequested` 플래그를 두고,
-  - 각 재귀 진입/루프마다 `IsStopRequesTed()`를 체크하여 **자연스럽게 상위로 빠져나오도록** 설계.
-
-- 정리 순서
-  - 중지 버튼 ➡ `RequestStop()` ➡ 재귀가 차례차례 종료 ➡ `StartScan()`이 끝 ➡  
-    `WM_SCAN_FINISHED` 전송 ➡ UI 스레드에서 버튼 상태 복구 및 스캐너 삭제.
+  - `DirectoryScanner` 안에 `m_stopRequested`라는 플래그를 두고,
+  - 재귀 진입과 루프 안에서 `IsStopResquested()`를 확인하는 식으로,
+  - **스레드가 스스로 깔끔하게 빠져나오도록** 만들었다.
 
 ➡ 이 과정 덕분에,  
-"멀티스레드에서 강제 종료 대신 플래그로 종료를 설계하는 패턴"을 직접 체감할 수 있었다.
+멀티스레드에서 스레드를 억지로 죽이기 보다, **스레드가 스스로 정리하고 끝나게 만드는 방식**의 중요성을 체감해보았다.
 
 ## ✔️그 외 자잘한 시행착오들
 
 - **경로 라벨(`탐색 경로:`)과 실제 입력 경로 동기화**
   - 시작 버튼을 누를 때마다 라벨을 현재 입력 경로로 갱신해 줘야 해서,
-  - 초기화/다시 시작 시점마다 라벨 업데이트를 누락하지 않는 것이 은근히 신경 쓸 포인트였다.
+  - 초기화/다시 시작 시점마다 라벨 업데이트를 빠뜨리지 않는 게 은근히 신경 쓰이는 부분이었다.
+
 - **Start 버튼 중복 클릭 방지**
-  - 스캔 중일 때 다시 Start를 눌러서 스레드가 두 개 뜨지 않도록
-    - `m_isScanning` 플래그로 버튼을 막고,
-    - UI에서도 아예 Start 버튼을 비활성화하는 이중 안전장치를 뒀다.
+  - 스캔 중일 때 Start를 눌러서 스레드가 두 개 이상 떠 버리지 않도록
+    - 코드에서는 `m_isScanning` 플래그로 한 번 막고,
+    - UI 쪽에서도 Start 버튼 자체를 비활성화해서 막아 두었다.
+
 - **리스트뷰 정렬**
-  - 특히 "크기" 컬럼 정렬 시
+  - 특히 "크기" 기준 정렬 시
     - 문자열 기준이 아닌 **숫자 기준**으로 비교해야 해서
-    - `LVITEM`에서 데이터를 읽어와 `ULONGLONG`으로 비교하는 커스텀 비교 함수를 작성했다.
-  - 정렬 토글(오름차순/내림차순)을 구현하며
+    - `LVITEM`에서 값을 꺼내 `ULONGLONG`으로 비교하는 커스텀 비교 함수를 작성했다.
+  - 정렬 방향(오름차순/내림차순)은
     - 현재 정렬 상태를 멤버로 들고 있다가 헤더 클릭 시 반전시키도록 설계했다. 
 
 ---
