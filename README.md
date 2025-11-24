@@ -186,6 +186,19 @@ bool              m_isScanning = false;
   - `m_pScanThread`는 MFC가 관리하지만, 필요 시 nullptr로 초기화.  
 **스마트 포인터가 없는 상태에서 이런 수동 규칙을 직접 잡아보는 게 이번 과제의 핵심 중 하나였다.**
 
+### 🔍delete 유무에 따른 메모리 사용 비교
+위 `OnScanUpdate`에서 `delete info;` 한 줄을 기준으로 메모리 사용량이 어떻게 달라지는지 프로파일러로 비교해 보았다.  
+경로 탐색을 한 번 실행했을 때도 차이가 있었지만,  
+경로 탐색을 반복해서 실행할 때 마다 메모리 사용량의 차이가 크게 보였다.
+
+**delete 호출 전**
+<img width="1473" height="603" alt="delete 지운 후" src="https://github.com/user-attachments/assets/98b43979-38df-499b-8902-9d593d4986ec" />
+
+**delete 호출 후**
+<img width="1473" height="602" alt="delete 지우기 전" src="https://github.com/user-attachments/assets/e8c64314-e3c8-4b09-9967-c9f8eff94558" />
+
+**경로 탐색은 3회를 반복해서 진행하며 탐색이 끝날 때 마다 메모리 사용량의 차이가 보이는 것을 알 수 있었다**
+
 ## ✔️멀티스레드 구조
 
 - **1. 스레드 시작**
